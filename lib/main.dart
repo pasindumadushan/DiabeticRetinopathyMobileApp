@@ -57,7 +57,11 @@ class AppShell extends StatelessWidget {
                   ),
                   child: const TabBar(
                     isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    padding: EdgeInsets.zero,
                     indicatorPadding: EdgeInsets.symmetric(horizontal: -4),
+                    labelPadding: EdgeInsets.symmetric(horizontal: 12),
+                    dividerColor: Colors.transparent,
                     indicator: BoxDecoration(
                       color: Colors.white24,
                       borderRadius: BorderRadius.all(Radius.circular(14)),
