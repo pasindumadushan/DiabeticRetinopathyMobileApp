@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/home/home.dart';
+import 'screens/upload/upload.dart';
 
 void main() {
   runApp(const MyApp());
@@ -83,7 +84,7 @@ class AppShell extends StatelessWidget {
                 child: TabBarView(
                   children: [
                     const HomeScreen(),
-                    const _TabPlaceholder(title: 'Retinal Scan'),
+                    const UploadScreen(),
                     const _TabPlaceholder(title: 'Diagnostics History'),
                     const _TabPlaceholder(title: 'About Us'),
                     const _TabPlaceholder(title: 'Settings'),
