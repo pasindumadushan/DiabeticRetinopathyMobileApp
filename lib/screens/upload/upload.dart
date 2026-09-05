@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../services/database_helper.dart';
+import '../../services/pytorch_service.dart';
 import 'components/upload_header.dart';
 import 'components/input_fields.dart';
 import 'components/selection_button.dart';
@@ -136,13 +137,15 @@ class _UploadScreenState extends State<UploadScreen> {
       await DatabaseHelper.instance.updatePatientRecordImagePaths(patientId, savedImagePaths);
     }
 
+    final analysisMessage = await PyTorchService.instance.analyzeImages(_selectedImagePaths);
+
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           savedImagePaths != null && savedImagePaths.isNotEmpty
-              ? 'Record saved with ${savedImagePaths.split(',').length} image(s).'
+              ? analysisMessage
               : 'Record saved successfully.',
         ),
       ),
