@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'screens/history/history.dart';
 import 'screens/home/home.dart';
 import 'screens/upload/upload.dart';
 
@@ -85,7 +86,7 @@ class AppShell extends StatelessWidget {
                   children: [
                     const HomeScreen(),
                     const UploadScreen(),
-                    const _TabPlaceholder(title: 'Diagnostics History'),
+                    const HistoryScreen(),
                     const _TabPlaceholder(title: 'About Us'),
                     const _TabPlaceholder(title: 'Settings'),
                   ],

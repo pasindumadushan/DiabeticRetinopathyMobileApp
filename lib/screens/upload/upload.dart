@@ -1,11 +1,162 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../../services/database_helper.dart';
 import 'components/upload_header.dart';
+import 'components/input_fields.dart';
 import 'components/selection_button.dart';
 import 'components/selected_images.dart';
 import 'components/footer_buttons.dart';
 
-class UploadScreen extends StatelessWidget {
+class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
+
+  @override
+  State<UploadScreen> createState() => _UploadScreenState();
+}
+
+class _UploadScreenState extends State<UploadScreen> {
+  static const int _maxImages = 4;
+
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  final TextEditingController _patientNameController = TextEditingController();
+  final TextEditingController _ageController = TextEditingController();
+  final TextEditingController _durationController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+
+  String _genderValue = 'Male';
+  String _diabeticValue = 'Yes';
+  final List<String> _selectedImagePaths = [];
+
+  void _removeImage(String path) {
+    setState(() {
+      _selectedImagePaths.remove(path);
+    });
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+
+    if (_selectedImagePaths.length >= _maxImages) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can select up to 4 images only.')),
+      );
+      return;
+    }
+
+    if (source == ImageSource.camera) {
+      final pickedFile = await picker.pickImage(source: source, imageQuality: 80);
+      if (pickedFile == null) return;
+
+      setState(() {
+        if (_selectedImagePaths.length < _maxImages) {
+          _selectedImagePaths.add(pickedFile.path);
+        }
+      });
+      return;
+    }
+
+    final remainingSlots = _maxImages - _selectedImagePaths.length;
+    if (remainingSlots <= 0) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You can select up to 4 images only.')),
+      );
+      return;
+    }
+
+    final pickedFiles = await picker.pickMultiImage(imageQuality: 80);
+    if (pickedFiles.isEmpty) return;
+
+    final allowedFiles = pickedFiles.take(remainingSlots).toList();
+    setState(() {
+      for (final file in allowedFiles) {
+        if (file.path.isNotEmpty) {
+          _selectedImagePaths.add(file.path);
+        }
+      }
+    });
+
+    if (allowedFiles.length < pickedFiles.length && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only 4 images are allowed.')),
+      );
+    }
+  }
+
+  Future<void> _handleAnalyze() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final record = {
+      'patient_name': _patientNameController.text.trim(),
+      'age': int.tryParse(_ageController.text.trim()) ?? 0,
+      'gender': _genderValue,
+      'diabetic': _diabeticValue,
+      'diabetes_duration': double.tryParse(_durationController.text.trim()) ?? 0.0,
+      'email': _emailController.text.trim(),
+      'created_at': DateTime.now().toIso8601String(),
+      'image_paths': '',
+    };
+
+    final patientId = await DatabaseHelper.instance.insertPatientRecord(record);
+    String? savedImagePaths;
+
+    if (_selectedImagePaths.isNotEmpty) {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      final folder = Directory('${appDocDir.path}/patient_record_$patientId');
+
+      if (!await folder.exists()) {
+        await folder.create(recursive: true);
+      }
+
+      final copiedPaths = <String>[];
+      for (int index = 0; index < _selectedImagePaths.length; index++) {
+        final sourceFile = File(_selectedImagePaths[index]);
+        if (!await sourceFile.exists()) {
+          continue;
+        }
+
+        final extension = sourceFile.path.split('.').last;
+        final targetFile = File(
+          '${folder.path}/image_${DateTime.now().millisecondsSinceEpoch}_$index.$extension',
+        );
+
+        final copiedFile = await sourceFile.copy(targetFile.path);
+        copiedPaths.add(copiedFile.path);
+      }
+
+      savedImagePaths = copiedPaths.isNotEmpty ? copiedPaths.join(',') : '';
+      await DatabaseHelper.instance.updatePatientRecordImagePaths(patientId, savedImagePaths);
+    }
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          savedImagePaths != null && savedImagePaths.isNotEmpty
+              ? 'Record saved with ${savedImagePaths.split(',').length} image(s).'
+              : 'Record saved successfully.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _patientNameController.dispose();
+    _ageController.dispose();
+    _durationController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,19 +176,48 @@ class UploadScreen extends StatelessWidget {
           style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
         ),
       ),
-      body: const SafeArea(
+      body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            children: [
-              UploadHeader(),
-              SizedBox(height: 20),
-              SelectionButton(),
-              SizedBox(height: 16),
-              SelectedImages(),
-              SizedBox(height: 20),
-              FooterButtons(),
-            ],
+          padding: const EdgeInsets.all(20),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                const UploadHeader(),
+                const SizedBox(height: 20),
+                InputFields(
+                  nameController: _patientNameController,
+                  ageController: _ageController,
+                  durationController: _durationController,
+                  emailController: _emailController,
+                  genderValue: _genderValue,
+                  diabeticValue: _diabeticValue,
+                  onGenderChanged: (value) {
+                    if (value != null) {
+                      setState(() => _genderValue = value);
+                    }
+                  },
+                  onDiabeticChanged: (value) {
+                    if (value != null) {
+                      setState(() => _diabeticValue = value);
+                    }
+                  },
+                ),
+                const SizedBox(height: 20),
+                SelectionButton(
+                  onSelectImage: _pickImage,
+                  maxImages: _maxImages,
+                  selectedCount: _selectedImagePaths.length,
+                ),
+                const SizedBox(height: 16),
+                SelectedImages(
+                  imagePaths: _selectedImagePaths,
+                  onRemove: _removeImage,
+                ),
+                const SizedBox(height: 20),
+                FooterButtons(onAnalyze: _handleAnalyze),
+              ],
+            ),
           ),
         ),
       ),

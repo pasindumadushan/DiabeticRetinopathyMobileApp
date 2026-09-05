@@ -1,7 +1,12 @@
 ﻿import 'package:flutter/material.dart';
 
 class FooterButtons extends StatelessWidget {
-  const FooterButtons({super.key});
+  const FooterButtons({
+    super.key,
+    required this.onAnalyze,
+  });
+
+  final Future<void> Function() onAnalyze;
 
   @override
   Widget build(BuildContext context) {
@@ -25,10 +30,8 @@ class FooterButtons extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Analyzing retinal image...')),
-              );
+            onPressed: () async {
+              await onAnalyze();
             },
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
