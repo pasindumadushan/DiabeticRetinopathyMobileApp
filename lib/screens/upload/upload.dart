@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../models/analysis_result.dart';
 import '../../services/database_helper.dart';
 import '../../services/pytorch_service.dart';
+import '../result/result.dart';
 import 'components/upload_header.dart';
 import 'components/input_fields.dart';
 import 'components/selection_button.dart';
@@ -90,6 +92,18 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  void _handleCancel() {
+    setState(() {
+      _patientNameController.clear();
+      _ageController.clear();
+      _durationController.clear();
+      _emailController.clear();
+      _genderValue = 'Male';
+      _diabeticValue = 'Yes';
+      _selectedImagePaths.clear();
+    });
+  }
+
   Future<void> _handleAnalyze() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -135,21 +149,61 @@ class _UploadScreenState extends State<UploadScreen> {
 
       savedImagePaths = copiedPaths.isNotEmpty ? copiedPaths.join(',') : '';
       await DatabaseHelper.instance.updatePatientRecordImagePaths(patientId, savedImagePaths);
-    }
 
-    final analysisMessage = await PyTorchService.instance.analyzeImages(_selectedImagePaths);
+      final analysisMessage = await PyTorchService.instance.analyzeImages(
+        _selectedImagePaths,
+        folder.path,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          savedImagePaths != null && savedImagePaths.isNotEmpty
-              ? analysisMessage
-              : 'Record saved successfully.',
+      // Parse the analysis message to extract class and mean
+      int predictedClass = 0;
+      double meanPrediction = 0.0;
+      try {
+        final regex = RegExp(r'Mean severity class: (\d+)');
+        final match = regex.firstMatch(analysisMessage);
+        if (match != null) {
+          predictedClass = int.parse(match.group(1)!);
+        }
+        
+        final meanRegex = RegExp(r'mean: ([\d.]+)');
+        final meanMatch = meanRegex.firstMatch(analysisMessage);
+        if (meanMatch != null) {
+          meanPrediction = double.parse(meanMatch.group(1)!);
+        }
+      } catch (e) {
+        debugPrint('Error parsing analysis message: $e');
+      }
+
+      // Get ben graham image paths
+      final benGrahamFiles = folder.listSync()
+          .whereType<File>()
+          .where((file) => file.path.contains('ben_graham'))
+          .map((file) => file.path)
+          .toList();
+
+      if (!mounted) return;
+
+      final result = AnalysisResult(
+        predictedClass: predictedClass,
+        meanPrediction: meanPrediction,
+        imagePaths: copiedPaths,
+        benGrahamPaths: benGrahamFiles,
+        analysisMessage: analysisMessage,
+        patientName: _patientNameController.text.trim(),
+        age: int.tryParse(_ageController.text.trim()) ?? 0,
+        gender: _genderValue,
+        diabetic: _diabeticValue,
+        diabetesDuration: double.tryParse(_durationController.text.trim()) ?? 0.0,
+      );
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => ResultScreen(result: result),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -218,7 +272,7 @@ class _UploadScreenState extends State<UploadScreen> {
                   onRemove: _removeImage,
                 ),
                 const SizedBox(height: 20),
-                FooterButtons(onAnalyze: _handleAnalyze),
+                FooterButtons(onAnalyze: _handleAnalyze, onCancel: _handleCancel),
               ],
             ),
           ),

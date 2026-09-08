@@ -23,8 +23,9 @@ class PyTorchInferenceChannel(
             when (call.method) {
                 "analyzeImages" -> {
                     val imagePaths = call.argument<List<String>>("imagePaths").orEmpty()
+                    val outputDir = call.argument<String>("outputDir") ?: ""
                     try {
-                        val message = analyze(imagePaths)
+                        val message = analyze(imagePaths, outputDir)
                         result.success(message)
                     } catch (e: Throwable) {
                         Log.e("PT_INFER", "analyzeImages crashed", e)
@@ -56,7 +57,85 @@ class PyTorchInferenceChannel(
         return loaded
     }
 
-    private fun analyze(imagePaths: List<String>): String {
+    private fun benGrahamEnhancement(bitmap: Bitmap): Bitmap {
+        Log.d("PT_INFER", "Applying Ben Graham enhancement")
+        
+        val width = bitmap.width
+        val height = bitmap.height
+        val pixels = IntArray(width * height)
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        
+        val gray = IntArray(width * height)
+        for (i in pixels.indices) {
+            val rgb = pixels[i]
+            val r = (rgb shr 16) and 0xFF
+            val g = (rgb shr 8) and 0xFF
+            val b = rgb and 0xFF
+            gray[i] = (0.299 * r + 0.587 * g + 0.114 * b).toInt()
+        }
+        
+        val blurred = simpleBlur(gray, width, height)
+        
+        val enhanced = IntArray(width * height)
+        for (i in gray.indices) {
+            val value = (gray[i] * 4 - blurred[i] * 4 + 128).toInt()
+            enhanced[i] = value.coerceIn(0, 255)
+        }
+        
+        val result = IntArray(width * height)
+        for (i in enhanced.indices) {
+            val g_val = enhanced[i]
+            result[i] = -0x1000000 or (g_val shl 16) or (g_val shl 8) or g_val
+        }
+        
+        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        output.setPixels(result, 0, width, 0, 0, width, height)
+        return output
+    }
+    
+    private fun simpleBlur(gray: IntArray, width: Int, height: Int): IntArray {
+        val blurred = IntArray(width * height)
+        val sigmaX = width / 30.0
+        
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                var sum = 0.0
+                var weight = 0.0
+                
+                for (dy in -3..3) {
+                    for (dx in -3..3) {
+                        val nx = (x + dx).coerceIn(0, width - 1)
+                        val ny = (y + dy).coerceIn(0, height - 1)
+                        val gaussian = Math.exp(-(dx * dx + dy * dy) / (2 * sigmaX * sigmaX))
+                        sum += gray[ny * width + nx] * gaussian
+                        weight += gaussian
+                    }
+                }
+                blurred[y * width + x] = (sum / weight).toInt()
+            }
+        }
+        return blurred
+    }
+
+    private fun saveEnhancedImage(bitmap: Bitmap, originalPath: String, outputDir: String): String? {
+        Log.d("PT_INFER", "saveEnhancedImage called: outputDir=$outputDir, originalPath=$originalPath")
+        if (outputDir.isEmpty()) return null
+        try {
+            val fileName = "ben_graham_${File(originalPath).name}"
+            val file = File(outputDir, fileName)
+            File(outputDir).mkdirs()
+            file.outputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+            }
+            Log.d("PT_INFER", "Saved enhanced image: ${file.absolutePath}")
+            return file.absolutePath
+        } catch (e: Exception) {
+            Log.e("PT_INFER", "Failed to save enhanced image", e)
+            return null
+        }
+    }
+
+    private fun analyze(imagePaths: List<String>, outputDir: String = ""): String {
         Log.d("PT_INFER", "analyze called, count=${imagePaths.size}")
         if (imagePaths.isEmpty()) return "No images selected."
 
@@ -74,9 +153,14 @@ class PyTorchInferenceChannel(
                 Log.d("PT_INFER", "Resizing image to 224x224")
                 val resized = Bitmap.createScaledBitmap(bitmap, 224, 224, true)
 
+                Log.d("PT_INFER", "Applying Ben Graham enhancement")
+                val enhanced = benGrahamEnhancement(resized)
+                
+                saveEnhancedImage(enhanced, imagePath, outputDir)
+
                 Log.d("PT_INFER", "Creating input tensor")
                 val inputTensor = TensorImageUtils.bitmapToFloat32Tensor(
-                    resized,
+                    enhanced,
                     floatArrayOf(0.485f, 0.456f, 0.406f),
                     floatArrayOf(0.229f, 0.224f, 0.225f)
                 )

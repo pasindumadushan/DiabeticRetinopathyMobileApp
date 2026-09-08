@@ -4,9 +4,11 @@ class FooterButtons extends StatelessWidget {
   const FooterButtons({
     super.key,
     required this.onAnalyze,
+    required this.onCancel,
   });
 
   final Future<void> Function() onAnalyze;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +17,7 @@ class FooterButtons extends StatelessWidget {
         Expanded(
           child: OutlinedButton(
             onPressed: () {
+              onCancel();
               DefaultTabController.of(context).animateTo(0);
             },
             style: OutlinedButton.styleFrom(
