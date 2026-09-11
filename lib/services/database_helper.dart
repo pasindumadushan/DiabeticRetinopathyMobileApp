@@ -20,7 +20,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDatabase,
       onUpgrade: _upgradeDatabase,
     );
@@ -29,6 +29,9 @@ class DatabaseHelper {
   Future<void> _upgradeDatabase(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE patient_records ADD COLUMN image_paths TEXT');
+    }
+    if (oldVersion < 3) {
+      await db.execute('ALTER TABLE patient_records ADD COLUMN severity TEXT');
     }
   }
 
@@ -43,6 +46,7 @@ class DatabaseHelper {
         diabetes_duration REAL,
         email TEXT,
         image_paths TEXT,
+        severity TEXT,
         created_at TEXT NOT NULL
       )
     ''' );
@@ -62,6 +66,16 @@ class DatabaseHelper {
     return db.update(
       'patient_records',
       {'image_paths': imagePaths},
+      where: 'id = ?',
+      whereArgs: [patientId],
+    );
+  }
+
+  Future<int> updatePatientRecordSeverity(int patientId, String severity) async {
+    final db = await database;
+    return db.update(
+      'patient_records',
+      {'severity': severity},
       where: 'id = ?',
       whereArgs: [patientId],
     );

@@ -40,6 +40,25 @@ class AnalysisResult {
     }
   }
 
+  /// Reverse of [severityLabel] — used to rebuild a predicted class from a
+  /// severity string previously saved to the database (e.g. for history).
+  static int classFromSeverityLabel(String? label) {
+    switch (label) {
+      case 'No DR':
+        return 0;
+      case 'Mild':
+        return 1;
+      case 'Moderate':
+        return 2;
+      case 'Severe':
+        return 3;
+      case 'Proliferative':
+        return 4;
+      default:
+        return -1;
+    }
+  }
+
   String get suggestion {
     switch (predictedClass) {
       case 0:

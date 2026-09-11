@@ -198,6 +198,13 @@ class _UploadScreenState extends State<UploadScreen> {
         diabetesDuration: double.tryParse(_durationController.text.trim()) ?? 0.0,
       );
 
+      await DatabaseHelper.instance.updatePatientRecordSeverity(
+        patientId,
+        result.severityLabel,
+      );
+
+      if (!mounted) return;
+
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => ResultScreen(result: result),
