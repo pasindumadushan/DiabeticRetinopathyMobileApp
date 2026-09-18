@@ -92,7 +92,7 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
-  void _handleCancel() {
+  void _clearFields() {
     setState(() {
       _patientNameController.clear();
       _ageController.clear();
@@ -102,6 +102,10 @@ class _UploadScreenState extends State<UploadScreen> {
       _diabeticValue = 'Yes';
       _selectedImagePaths.clear();
     });
+  }
+
+  void _handleCancel() {
+    _clearFields();
   }
 
   Future<void> _handleAnalyze() async {
@@ -204,6 +208,8 @@ class _UploadScreenState extends State<UploadScreen> {
       );
 
       if (!mounted) return;
+
+      _clearFields();
 
       Navigator.of(context).push(
         MaterialPageRoute(

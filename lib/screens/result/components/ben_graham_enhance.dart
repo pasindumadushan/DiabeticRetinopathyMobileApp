@@ -106,6 +106,12 @@ class BenGrahamEnhance extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                       child: Image.file(
                         File(benGrahamPaths[index]),
+                        // Flutter's image cache keys by file path, not content — bust it with
+                        // the file's mtime so an overwritten file (same path, new bytes) isn't
+                        // served stale from a previous run.
+                        key: ValueKey(
+                          '${benGrahamPaths[index]}_${File(benGrahamPaths[index]).statSync().modified.millisecondsSinceEpoch}',
+                        ),
                         width: 150,
                         height: 150,
                         fit: BoxFit.cover,
