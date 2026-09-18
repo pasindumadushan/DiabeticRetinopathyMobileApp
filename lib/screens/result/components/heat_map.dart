@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'heatmap_preview.dart';
 
 class HeatMap extends StatefulWidget {
@@ -38,21 +40,21 @@ class _HeatMapState extends State<HeatMap> {
         double value = 0.0;
         
         // Center attention
-        final distCenter = Math.sqrt(
-          Math.pow(i - centerI, 2) + Math.pow(j - centerJ, 2),
+        final distCenter = math.sqrt(
+          math.pow(i - centerI, 2) + math.pow(j - centerJ, 2),
         );
-        value += Math.exp(-distCenter / 3.0);
-        
+        value += math.exp(-distCenter / 3.0);
+
         // Secondary attention spots (retinal lesion areas)
-        final dist1 = Math.sqrt(
-          Math.pow(i - 5, 2) + Math.pow(j - 5, 2),
+        final dist1 = math.sqrt(
+          math.pow(i - 5, 2) + math.pow(j - 5, 2),
         );
-        value += 0.6 * Math.exp(-dist1 / 2.5);
-        
-        final dist2 = Math.sqrt(
-          Math.pow(i - 12, 2) + Math.pow(j - 11, 2),
+        value += 0.6 * math.exp(-dist1 / 2.5);
+
+        final dist2 = math.sqrt(
+          math.pow(i - 12, 2) + math.pow(j - 11, 2),
         );
-        value += 0.5 * Math.exp(-dist2 / 2.0);
+        value += 0.5 * math.exp(-dist2 / 2.0);
         
         return value.clamp(0.0, 1.0);
       }),
@@ -259,10 +261,25 @@ class _HeatmapOverlayPainter extends CustomPainter {
     final cellWidth = size.width / cols;
     final cellHeight = size.height / rows;
 
+    // Paint each cell into an off-screen layer first, then blur the whole
+    // layer. This melts the hard grid-cell edges into a smooth radial
+    // gradient instead of a blocky checkerboard, and makes the classic
+    // "cold -> hot" transition actually readable.
+    final blurSigma = math.max(cellWidth, cellHeight) * 0.75;
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+    );
+
     for (int i = 0; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
-        final value = heatmapData[i][j];
+        final value = heatmapData[i][j].clamp(0.0, 1.0);
+        if (value < 0.05) continue; // keep cold areas transparent
+
         final color = _getHeatmapColor(value);
+        // Scale opacity with intensity so hot spots pop and cold areas
+        // fade into the underlying image, instead of a flat wash of color.
+        final opacity = 0.15 + value * 0.55;
 
         final rect = Rect.fromLTWH(
           j * cellWidth,
@@ -271,29 +288,15 @@ class _HeatmapOverlayPainter extends CustomPainter {
           cellHeight,
         );
 
-        canvas.drawRect(rect, Paint()..color = color.withOpacity(0.5));
+        canvas.drawRect(rect, Paint()..color = color.withOpacity(opacity));
       }
     }
+
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(_HeatmapOverlayPainter oldDelegate) {
     return oldDelegate.heatmapData != heatmapData;
-  }
-}
-
-// Math utilities
-class Math {
-  static double sqrt(double value) => value.abs() * 0.5;
-  static double pow(double base, double exponent) => base * base;
-  static double exp(double value) {
-    // Approximate exp using Taylor series
-    double result = 1.0;
-    double term = 1.0;
-    for (int i = 1; i < 10; i++) {
-      term *= value / i;
-      result += term;
-    }
-    return result;
   }
 }

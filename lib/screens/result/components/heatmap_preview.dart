@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 class HeatmapPreview extends StatefulWidget {
@@ -137,10 +138,21 @@ class HeatmapPainter extends CustomPainter {
     final cellWidth = size.width / cols;
     final cellHeight = size.height / rows;
 
+    // Blur the whole overlay layer so the grid cells melt into a smooth
+    // gradient instead of a hard-edged, blocky checkerboard.
+    final blurSigma = math.max(cellWidth, cellHeight) * 0.75;
+    canvas.saveLayer(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..imageFilter = ui.ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+    );
+
     for (int i = 0; i < rows; i++) {
       for (int j = 0; j < cols; j++) {
-        final value = heatmapData[i][j];
+        final value = heatmapData[i][j].clamp(0.0, 1.0);
+        if (value < 0.05) continue; // keep cold areas transparent
+
         final color = _getHeatmapColor(value);
+        final opacity = 0.15 + value * 0.6;
 
         final rect = Rect.fromLTWH(
           j * cellWidth,
@@ -149,9 +161,11 @@ class HeatmapPainter extends CustomPainter {
           cellHeight,
         );
 
-        canvas.drawRect(rect, Paint()..color = color.withOpacity(0.6));
+        canvas.drawRect(rect, Paint()..color = color.withOpacity(opacity));
       }
     }
+
+    canvas.restore();
   }
 
   @override

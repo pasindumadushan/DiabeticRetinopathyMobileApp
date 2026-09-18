@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
-import '../../../models/analysis_result.dart';
-import '../../result/result.dart';
+import '../../../utils/patient_record_utils.dart';
 
 class HistoryList extends StatelessWidget {
   const HistoryList({
@@ -44,7 +41,7 @@ class HistoryList extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            onTap: () => _openRecordResult(context, record),
+            onTap: () => openRecordResult(context, record),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.all(18),
@@ -99,57 +96,6 @@ class HistoryList extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  Future<void> _openRecordResult(
-    BuildContext context,
-    Map<String, dynamic> record,
-  ) async {
-    final imagePathsRaw = record['image_paths'] as String? ?? '';
-    final imagePaths = imagePathsRaw
-        .split(',')
-        .map((path) => path.trim())
-        .where((path) => path.isNotEmpty)
-        .toList();
-
-    // Ben Graham enhanced images were saved alongside the original uploads,
-    // in the same patient_record_<id> folder, during analysis.
-    final benGrahamPaths = <String>[];
-    if (imagePaths.isNotEmpty) {
-      final folder = File(imagePaths.first).parent;
-      if (await folder.exists()) {
-        benGrahamPaths.addAll(
-          folder
-              .listSync()
-              .whereType<File>()
-              .where((file) => file.path.contains('ben_graham'))
-              .map((file) => file.path),
-        );
-      }
-    }
-
-    final severityLabel = record['severity'] as String?;
-
-    final result = AnalysisResult(
-      predictedClass: AnalysisResult.classFromSeverityLabel(severityLabel),
-      meanPrediction: 0.0,
-      imagePaths: imagePaths,
-      benGrahamPaths: benGrahamPaths,
-      analysisMessage: '',
-      patientName: record['patient_name'] as String? ?? 'N/A',
-      age: record['age'] as int? ?? 0,
-      gender: record['gender'] as String? ?? 'N/A',
-      diabetic: record['diabetic'] as String? ?? 'No',
-      diabetesDuration: (record['diabetes_duration'] as num?)?.toDouble() ?? 0.0,
-    );
-
-    if (!context.mounted) return;
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ResultScreen(result: result),
-      ),
     );
   }
 }

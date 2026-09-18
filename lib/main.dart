@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'screens/about/about.dart';
 import 'screens/history/history.dart';
 import 'screens/home/home.dart';
+import 'screens/settings/settings.dart';
 import 'screens/upload/upload.dart';
+import 'services/theme_controller.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await ThemeController.instance.load();
   runApp(const MyApp());
 }
 
@@ -12,12 +17,28 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Diabetic Retinopathy Mobile App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const AppShell(),
+    return ListenableBuilder(
+      listenable: ThemeController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          title: 'Diabetic Retinopathy Mobile App',
+          theme: ThemeData(
+            brightness: Brightness.light,
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+            scaffoldBackgroundColor: const Color(0xFFF5F7FF),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.deepPurple,
+              brightness: Brightness.dark,
+            ),
+            scaffoldBackgroundColor: const Color(0xFF0F1115),
+          ),
+          themeMode: ThemeController.instance.themeMode,
+          home: const AppShell(),
+        );
+      },
     );
   }
 }
@@ -30,7 +51,7 @@ class AppShell extends StatelessWidget {
     return DefaultTabController(
       length: 5,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FF),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Column(
             children: [
@@ -87,30 +108,14 @@ class AppShell extends StatelessWidget {
                     const HomeScreen(),
                     const UploadScreen(),
                     const HistoryScreen(),
-                    const _TabPlaceholder(title: 'About Us'),
-                    const _TabPlaceholder(title: 'Settings'),
+                    const AboutScreen(),
+                    const SettingsScreen(),
                   ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TabPlaceholder extends StatelessWidget {
-  const _TabPlaceholder({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.headlineSmall,
       ),
     );
   }
